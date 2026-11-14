@@ -6,6 +6,7 @@ import { init, parse } from 'es-module-lexer'
 import { isAbsolute, join, relative } from 'pathe'
 import { createUnplugin } from 'unplugin'
 import { createFilter } from 'unplugin-utils'
+import { createToRelative } from './utils'
 
 const PROXY_ID = '\0impound:proxy'
 const PROXY_ID_RE = /^\0impound:proxy$/
@@ -661,6 +662,7 @@ export const ImpoundPlugin = createUnplugin<ImpoundOptions>((globalOptions) => {
   const heldMessages = new Set<string>()
 
   const cwd = globalOptions.cwd
+  const toRelative = createToRelative(cwd)
 
   function hold(importer: string, violation: PendingViolation): void {
     if (violation.warnedMessages) {
@@ -772,7 +774,7 @@ export const ImpoundPlugin = createUnplugin<ImpoundOptions>((globalOptions) => {
         resolvedId = RELATIVE_IMPORT_RE.test(rawId)
           ? join(stripQuery(importer), '..', rawId)
           : rawId
-        relativeId = isAbsolute(resolvedId) && cwd ? relative(cwd, resolvedId) : resolvedId
+        relativeId = toRelative(resolvedId)
         let importerResolved = resolvedImports.get(importer)
         if (!importerResolved) {
           importerResolved = new Map()
@@ -797,13 +799,13 @@ export const ImpoundPlugin = createUnplugin<ImpoundOptions>((globalOptions) => {
           continue
         }
 
-        relativeId ??= isAbsolute(resolvedId) && cwd ? relative(cwd, resolvedId) : resolvedId
+        relativeId ??= toRelative(resolvedId)
         const id = relativeId
 
         if (relativeImporter === undefined) {
           relativeImporter = relativeImporterCache.get(importer)
           if (relativeImporter === undefined) {
-            relativeImporter = isAbsolute(importer) && cwd ? relative(cwd, importer) : importer
+            relativeImporter = toRelative(importer)
             relativeImporterCache.set(importer, relativeImporter)
           }
         }
@@ -939,7 +941,7 @@ export const ImpoundPlugin = createUnplugin<ImpoundOptions>((globalOptions) => {
 
       // Flush violations that were waiting for this module's transform, under every id
       // form resolveId may have keyed them by.
-      const relativeId = isAbsolute(id) && cwd ? relative(cwd, id) : id
+      const relativeId = toRelative(id)
       const candidateKeys = new Set([id, relativeId, bareId, stripQuery(relativeId)])
       for (const key of candidateKeys) {
         const pending = pendingViolations.get(key)
